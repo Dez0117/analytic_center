@@ -1,0 +1,124 @@
+{
+  "items": [
+    {
+      "id": "reg-kii-low-1",
+      "source": {"id": "src-mincifry", "name": "Минцифры России — demo", "type": "regulator"},
+      "url": "https://demo.example/regulations/kii-requirements",
+      "title": "Уточнены обязательные требования к ПО для объектов КИИ",
+      "text": "Минцифры представило проект обязательных требований к программному обеспечению для объектов КИИ. Обсуждение проекта продлится до 18 сентября 2026 года. Документ может затронуть порядок выбора отечественных решений.",
+      "published_at": "2026-09-03T08:10:00+03:00",
+      "fetched_at": "2026-09-03T08:15:00+03:00",
+      "metadata": {"entity_type": "regulation", "regulation_identifier": "DEMO-КИИ-2026", "document_type": "проект приказа", "stage": "общественное обсуждение", "next_checkpoint": "2026-09-18", "force_low": true, "demo_fixture": true}
+    },
+    {
+      "id": "reg-kii-low-2",
+      "source": {"id": "src-association", "name": "Отраслевая ассоциация — demo", "type": "website"},
+      "url": "https://demo.example/association/kii-copy",
+      "title": "Уточнены обязательные требования к ПО для объектов КИИ",
+      "text": "Минцифры представило проект обязательных требований к программному обеспечению для объектов КИИ. Обсуждение проекта продлится до 18 сентября 2026 года. Документ может затронуть порядок выбора отечественных решений.",
+      "published_at": "2026-09-03T08:25:00+03:00",
+      "fetched_at": "2026-09-03T08:28:00+03:00",
+      "metadata": {"entity_type": "regulation", "regulation_identifier": "DEMO-КИИ-2026", "document_type": "проект приказа", "stage": "общественное обсуждение", "next_checkpoint": "2026-09-18", "force_low": true, "demo_fixture": true}
+    },
+    {
+      "id": "reg-ai-initiative",
+      "source": {"id": "src-duma", "name": "Государственная Дума — demo", "type": "regulator"},
+      "url": "https://demo.example/regulations/ai-2026/first-reading",
+      "title": "Проект регулирования рекомендательных систем прошёл первое чтение",
+      "text": "Государственная Дума приняла в первом чтении законопроект о прозрачности рекомендательных систем. Проект предусматривает раскрытие основных принципов работы алгоритмов. Срок подготовки поправок назначен на 25 сентября 2026 года.",
+      "published_at": "2026-09-02T14:00:00+03:00",
+      "fetched_at": "2026-09-02T14:10:00+03:00",
+      "metadata": {"entity_type": "regulation", "regulation_identifier": "DEMO-AI-2048", "document_type": "законопроект", "stage": "первое чтение", "next_checkpoint": "2026-09-25", "demo_fixture": true}
+    },
+    {
+      "id": "reg-ai-update",
+      "source": {"id": "src-duma", "name": "Государственная Дума — demo", "type": "regulator"},
+      "url": "https://demo.example/regulations/ai-2026/amendments",
+      "title": "Опубликованы поправки к проекту о рекомендательных системах",
+      "text": "Комитет Государственной Думы опубликовал таблицу поправок к законопроекту о прозрачности рекомендательных систем. В документе уточнены требования к информированию пользователей. Второе чтение запланировано на 8 октября 2026 года.",
+      "published_at": "2026-09-03T12:30:00+03:00",
+      "fetched_at": "2026-09-03T12:35:00+03:00",
+      "metadata": {"entity_type": "regulation", "regulation_identifier": "DEMO-AI-2048", "document_type": "законопроект", "stage": "подготовка ко второму чтению", "next_checkpoint": "2026-10-08", "demo_fixture": true}
+    },
+    {
+      "id": "news-ott-release",
+      "source": {"id": "src-telecom", "name": "Телеком Медиа — demo", "type": "rss"},
+      "url": "https://demo.example/media/ott-platform",
+      "title": "Региональный оператор запускает новую OTT-платформу",
+      "text": "Региональный оператор объявил о запуске OTT-платформы для 120 тысяч абонентов. Сервис объединит линейное телевидение и библиотеку видео. Поставщика технологической платформы выберут в четвёртом квартале.",
+      "published_at": "2026-09-03T09:20:00+03:00",
+      "fetched_at": "2026-09-03T09:25:00+03:00",
+      "metadata": {"demo_fixture": true, "tender_signal": true}
+    },
+    {
+      "id": "news-data-leak",
+      "source": {"id": "src-security", "name": "Инфобезопасность — demo", "type": "telegram"},
+      "url": "https://demo.example/security/operator-leak",
+      "title": "Оператор сообщил об инциденте с персональными данными",
+      "text": "Телеком-оператор сообщил об утечке персональных данных части клиентов. Компания начала внутреннее расследование и уведомила Роскомнадзор. Масштаб инцидента пока не раскрыт.",
+      "published_at": "2026-09-03T10:05:00+03:00",
+      "fetched_at": "2026-09-03T10:07:00+03:00",
+      "metadata": {"demo_fixture": true}
+    },
+    {
+      "id": "news-drm-standard-1",
+      "source": {"id": "src-industry", "name": "Медиа Индустрия — demo", "type": "website"},
+      "url": "https://demo.example/industry/drm-standard",
+      "title": "Операторы согласовали пилот единого стандарта DRM",
+      "text": "Крупные операторы согласовали пилот совместимости решений DRM для онлайн-кинотеатров. Испытания начнутся в октябре на трёх платформах. Результаты планируют представить отраслевой ассоциации.",
+      "published_at": "2026-09-03T11:00:00+03:00",
+      "fetched_at": "2026-09-03T11:03:00+03:00",
+      "metadata": {"demo_fixture": true}
+    },
+    {
+      "id": "news-drm-opinion",
+      "source": {"id": "src-expert", "name": "Экспертный канал — demo", "type": "telegram"},
+      "url": "https://demo.example/opinion/drm-standard",
+      "title": "Мнение: единый стандарт DRM потребует открытого тестирования",
+      "text": "Эксперт считает, что пилот совместимости DRM будет полезен только при открытой методике тестирования. Он предлагает заранее согласовать набор устройств и сценариев. Это мнение, а не новое решение операторов.",
+      "published_at": "2026-09-03T11:40:00+03:00",
+      "fetched_at": "2026-09-03T11:41:00+03:00",
+      "metadata": {"demo_fixture": true, "material_role": "opinion"}
+    },
+    {
+      "id": "news-competitor-1",
+      "source": {"id": "src-business", "name": "Деловые новости — demo", "type": "rss"},
+      "url": "https://demo.example/business/competitor-tv",
+      "title": "Ростелеком расширяет платформу интерактивного ТВ",
+      "text": "Ростелеком объявил о расширении платформы интерактивного ТВ в пяти регионах. Обновление включает персональные рекомендации и облачную запись. Запуск завершат до конца года.",
+      "published_at": "2026-09-03T07:40:00+03:00",
+      "fetched_at": "2026-09-03T07:45:00+03:00",
+      "metadata": {"demo_fixture": true}
+    },
+    {
+      "id": "news-competitor-2",
+      "source": {"id": "src-regional", "name": "Региональные новости — demo", "type": "website"},
+      "url": "https://demo.example/regions/competitor-tv-copy",
+      "title": "Ростелеком расширяет платформу интерактивного ТВ",
+      "text": "Ростелеком объявил о расширении платформы интерактивного ТВ в пяти регионах. Обновление включает персональные рекомендации и облачную запись. Запуск завершат до конца года.",
+      "published_at": "2026-09-03T08:00:00+03:00",
+      "fetched_at": "2026-09-03T08:02:00+03:00",
+      "metadata": {"demo_fixture": true}
+    },
+    {
+      "id": "noise-sport",
+      "source": {"id": "src-city", "name": "Городская лента — demo", "type": "rss"},
+      "url": "https://demo.example/city/football",
+      "title": "Городская команда выиграла товарищеский матч",
+      "text": "Городская футбольная команда выиграла товарищеский матч со счётом два один. Встречу посетили четыре тысячи зрителей. Следующая игра состоится в субботу.",
+      "published_at": "2026-09-03T06:30:00+03:00",
+      "fetched_at": "2026-09-03T06:35:00+03:00",
+      "metadata": {"demo_fixture": true, "noise": true}
+    },
+    {
+      "id": "noise-weather",
+      "source": {"id": "src-city", "name": "Городская лента — demo", "type": "rss"},
+      "url": "https://demo.example/city/weather",
+      "title": "Синоптики ожидают тёплые выходные",
+      "text": "Синоптики ожидают тёплую погоду в ближайшие выходные. Температура поднимется до двадцати градусов. Осадков в городе не прогнозируется.",
+      "published_at": "2026-09-03T05:45:00+03:00",
+      "fetched_at": "2026-09-03T05:50:00+03:00",
+      "metadata": {"demo_fixture": true, "noise": true}
+    }
+  ]
+}
