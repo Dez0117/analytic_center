@@ -24,6 +24,15 @@ class Source(Base):
     last_success: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_error: Mapped[str | None] = mapped_column(Text)
 
+    # Расписание и состояние опроса; заполняет модуль парсинга.
+    poll_interval_minutes: Mapped[int] = mapped_column(Integer, default=30, server_default="30")
+    config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, server_default="{}")
+    last_polled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_status: Mapped[str | None] = mapped_column(String(20))
+    last_item_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    etag: Mapped[str | None] = mapped_column(String(300))
+    last_modified: Mapped[str | None] = mapped_column(String(200))
+
 
 class EventCluster(Base):
     __tablename__ = "event_clusters"
@@ -42,7 +51,7 @@ class RawItemRecord(Base):
     external_id: Mapped[str | None] = mapped_column(String(300))
     source_id: Mapped[str] = mapped_column(ForeignKey("sources.id"))
     cluster_id: Mapped[str] = mapped_column(ForeignKey("event_clusters.id"))
-    url: Mapped[str | None] = mapped_column(Text)
+    url: Mapped[str | None] = mapped_column(Text, index=True)
     title: Mapped[str] = mapped_column(Text)
     text: Mapped[str] = mapped_column(Text)
     author: Mapped[str | None] = mapped_column(String(300))

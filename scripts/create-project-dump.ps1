@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 
 if (-not $OutputPath) {
-    $OutputPath = Join-Path $projectRoot ("dumps\gs-radar-{0}.zip" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
+    $OutputPath = Join-Path $projectRoot ("dumps\gosradar-{0}.zip" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
 } elseif (-not [IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $projectRoot $OutputPath
 }

@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from contextlib import asynccontextmanager
-from datetime import date, datetime, timezone
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -13,27 +13,45 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.database import Base, engine, get_db
+from app.database import SessionLocal, get_db, init_db
 from app.integrations.parser_adapter import normalize_parser_payload
 from app.models import AnalysisVersion, EventCluster, ManualOverride, RawItemRecord, RegulatoryCase, Source
-from app.schemas import AnalyzeBatchRequest, ItemPatch, ManualItemCreate, RawItem, SourceCreate, SourcePatch
+from app.parsing import PollingScheduler, get_fetcher, seed_default_sources
+from app.schemas import (
+    AnalyzeBatchRequest,
+    ItemPatch,
+    ManualItemCreate,
+    PollRequest,
+    SourceCreate,
+    SourcePatch,
+)
 from app.services.analysis import analyze_record
 from app.services.dedup import BaselineDeduplicator
 from app.services.llm import make_provider
+from app.services.storage import store_raw_items
 
 settings = get_settings()
 provider = make_provider(settings)
 deduplicator = BaselineDeduplicator()
+scheduler = PollingScheduler(SessionLocal, settings)
 FIXTURES = Path(__file__).parents[2] / "fixtures"
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    Base.metadata.create_all(engine)
-    yield
+    init_db()
+    if settings.parser_seed_defaults:
+        with SessionLocal() as db:
+            seed_default_sources(db)
+    if settings.parser_enabled:
+        await scheduler.start()
+    try:
+        yield
+    finally:
+        await scheduler.stop()
 
 
-app = FastAPI(title="GS Radar API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="GosRadar API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_origin],
@@ -43,56 +61,10 @@ app.add_middleware(
 )
 
 
-def _source_id(item: RawItem) -> str:
-    return item.source.id or "src-" + hashlib.sha256(
-        f"{item.source.type}:{item.source.name}".casefold().encode()
-    ).hexdigest()[:16]
-
-
 def _store_items(db: Session, payload: Any) -> dict[str, Any]:
     normalized = normalize_parser_payload(payload)
-    ids: list[str] = []
-    for item in normalized.accepted:
-        if db.get(RawItemRecord, item.id):
-            ids.append(item.id)
-            continue
-        source_id = _source_id(item)
-        source = db.get(Source, source_id)
-        if not source:
-            source = Source(
-                id=source_id,
-                name=item.source.name,
-                type=item.source.type,
-                url=item.url,
-                enabled=True,
-                last_success=datetime.now(timezone.utc),
-            )
-            db.add(source)
-            db.flush()
-        else:
-            source.last_success = datetime.now(timezone.utc)
-        cluster = deduplicator.cluster_for(db, item)
-        record = RawItemRecord(
-            id=item.id,
-            external_id=item.external_id,
-            source_id=source.id,
-            cluster_id=cluster.id,
-            url=item.url,
-            title=item.title,
-            text=item.text,
-            author=item.author,
-            published_at=item.published_at,
-            fetched_at=item.fetched_at,
-            language=item.language,
-            attachments=item.attachments,
-            metadata_json=item.metadata,
-            raw_payload=item.raw_payload,
-            content_hash=item.content_hash,
-        )
-        db.add(record)
-        db.flush()
-        ids.append(record.id)
-    db.commit()
+    report = store_raw_items(db, normalized.accepted, deduplicator=deduplicator)
+    ids = report.stored_ids + report.known_ids
     return {
         "accepted": len(ids),
         "item_ids": ids,
@@ -196,7 +168,7 @@ def create_manual(payload: ManualItemCreate, db: Session = Depends(get_db)) -> d
         "title": payload.title,
         "text": payload.text,
         "url": payload.url,
-        "published_at": payload.published_at,
+        "published_at": payload.published_at.isoformat() if payload.published_at else None,
     })
     if result["errors"]:
         raise HTTPException(status_code=422, detail=result["errors"])
@@ -351,11 +323,38 @@ def list_regulations(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
     ]
 
 
+def _item_counts(db: Session) -> dict[str, int]:
+    """Сколько материалов собрано по каждому источнику."""
+    rows = db.execute(
+        select(RawItemRecord.source_id, func.count()).group_by(RawItemRecord.source_id)
+    ).all()
+    return {source_id: count for source_id, count in rows}
+
+
+def _source_view(source: Source, items_count: int = 0) -> dict[str, Any]:
+    return {
+        "id": source.id,
+        "items_count": items_count,
+        "name": source.name,
+        "type": source.type,
+        "url": source.url,
+        "enabled": source.enabled,
+        "last_success": source.last_success,
+        "last_error": source.last_error,
+        "poll_interval_minutes": source.poll_interval_minutes,
+        "config": source.config or {},
+        "last_polled_at": source.last_polled_at,
+        "last_status": source.last_status,
+        "last_item_count": source.last_item_count,
+        "pollable": get_fetcher((source.config or {}).get("fetcher") or source.type) is not None,
+    }
+
+
 @app.get("/api/sources")
 def list_sources(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+    counts = _item_counts(db)
     return [
-        {"id": source.id, "name": source.name, "type": source.type, "url": source.url,
-         "enabled": source.enabled, "last_success": source.last_success, "last_error": source.last_error}
+        _source_view(source, counts.get(source.id, 0))
         for source in db.scalars(select(Source).order_by(Source.name)).all()
     ]
 
@@ -368,7 +367,7 @@ def create_source(payload: SourceCreate, db: Session = Depends(get_db)) -> dict[
     source = Source(id=source_id, **payload.model_dump())
     db.add(source)
     db.commit()
-    return {"id": source.id, **payload.model_dump()}
+    return _source_view(source)
 
 
 @app.patch("/api/sources/{source_id}")
@@ -378,8 +377,11 @@ def patch_source(source_id: str, payload: SourcePatch, db: Session = Depends(get
         raise HTTPException(status_code=404, detail="Источник не найден")
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(source, field, value)
+    if {"url", "type", "config"} & set(payload.model_dump(exclude_none=True)):
+        source.etag = None
+        source.last_modified = None
     db.commit()
-    return {"id": source.id, "name": source.name, "type": source.type, "url": source.url, "enabled": source.enabled}
+    return _source_view(source, _item_counts(db).get(source.id, 0))
 
 
 @app.delete("/api/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -392,6 +394,49 @@ def delete_source(source_id: str, db: Session = Depends(get_db)) -> None:
         raise HTTPException(status_code=409, detail="Источник связан с материалами; отключите его вместо удаления")
     db.delete(source)
     db.commit()
+
+
+@app.post("/api/sources/{source_id}/poll")
+async def poll_single_source(source_id: str, db: Session = Depends(get_db)) -> dict[str, Any]:
+    if not db.get(Source, source_id):
+        raise HTTPException(status_code=404, detail="Источник не найден")
+    reports = await scheduler.run_sources([source_id])
+    if not reports:
+        raise HTTPException(status_code=404, detail="Источник не найден")
+    return reports[0].as_dict()
+
+
+@app.post("/api/sources/import-defaults", status_code=status.HTTP_201_CREATED)
+def import_default_sources(db: Session = Depends(get_db)) -> dict[str, Any]:
+    return seed_default_sources(db).as_dict()
+
+
+@app.post("/api/parser/run")
+async def run_parser(payload: PollRequest | None = None, db: Session = Depends(get_db)) -> dict[str, Any]:
+    request = payload or PollRequest()
+    if request.source_ids:
+        source_ids = request.source_ids
+    elif request.force:
+        source_ids = [
+            source.id
+            for source in db.scalars(select(Source).where(Source.enabled.is_(True))).all()
+            if get_fetcher((source.config or {}).get("fetcher") or source.type) and source.url
+        ]
+    else:
+        source_ids = scheduler.due_source_ids()
+    reports = await scheduler.run_sources(source_ids)
+    return {
+        "polled": len(reports),
+        "stored": sum(report.stored for report in reports),
+        "duplicates": sum(report.duplicates for report in reports),
+        "errors": sum(report.status == "error" for report in reports),
+        "reports": [report.as_dict() for report in reports],
+    }
+
+
+@app.get("/api/parser/status")
+def parser_status() -> dict[str, Any]:
+    return scheduler.status()
 
 
 @app.get("/api/stats")

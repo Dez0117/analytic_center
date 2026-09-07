@@ -4,6 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1",
+  "httpx>=0.27,<1",
   "openai>=1.55,<3",
   "pydantic-settings>=2.6,<3",
   "sqlalchemy>=2.0,<3",
@@ -11,10 +12,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["httpx>=0.27,<1", "pytest>=8,<9"]
+test = ["pytest>=8,<9", "pytest-asyncio>=0.24,<2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
 
 [tool.setuptools.packages.find]
 include = ["app*"]

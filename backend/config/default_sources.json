@@ -1,0 +1,122 @@
+{
+  "comment": "Стартовый список источников трёх категорий из ТЗ. Список редактируется через интерфейс: адреса, интервалы и config меняются без правки кода. fetch_full_text догружает статью, когда лента отдаёт только заголовок.",
+  "sources": [
+    {
+      "id": "src-ria-rss",
+      "name": "РИА Новости — лента",
+      "type": "rss",
+      "url": "https://ria.ru/export/rss2/archive/index.xml",
+      "poll_interval_minutes": 15,
+      "config": {
+        "category_hint": "media",
+        "fetch_full_text": true,
+        "max_items": 15
+      }
+    },
+    {
+      "id": "src-interfax-rss",
+      "name": "Интерфакс — лента",
+      "type": "rss",
+      "url": "https://www.interfax.ru/rss.asp",
+      "poll_interval_minutes": 15,
+      "config": {
+        "category_hint": "media",
+        "fetch_full_text": true,
+        "max_items": 15
+      }
+    },
+    {
+      "id": "src-rbc-rss",
+      "name": "РБК — новости",
+      "type": "rss",
+      "url": "https://rssexport.rbc.ru/rbcnews/news/30/full.rss",
+      "poll_interval_minutes": 15,
+      "config": {
+        "category_hint": "media",
+        "fetch_full_text": true,
+        "max_items": 15
+      }
+    },
+    {
+      "id": "src-kommersant-rss",
+      "name": "Коммерсантъ — новости",
+      "type": "rss",
+      "url": "https://www.kommersant.ru/RSS/news.xml",
+      "poll_interval_minutes": 30,
+      "config": {
+        "category_hint": "media",
+        "fetch_full_text": true,
+        "max_items": 15
+      }
+    },
+    {
+      "id": "src-cbr-events",
+      "name": "Банк России — события",
+      "type": "regulator",
+      "url": "https://www.cbr.ru/rss/eventrss",
+      "poll_interval_minutes": 30,
+      "config": {
+        "fetcher": "rss",
+        "category_hint": "regulation",
+        "fetch_full_text": true,
+        "max_items": 15
+      }
+    },
+    {
+      "id": "src-government-rss",
+      "name": "Правительство РФ — все материалы",
+      "type": "regulator",
+      "url": "http://government.ru/all/rss/",
+      "poll_interval_minutes": 30,
+      "config": {
+        "fetcher": "rss",
+        "category_hint": "regulation",
+        "fetch_full_text": true,
+        "max_items": 15
+      }
+    },
+    {
+      "id": "src-duma-news",
+      "name": "Госдума — новости",
+      "type": "regulator",
+      "url": "http://duma.gov.ru/news/",
+      "poll_interval_minutes": 60,
+      "config": {
+        "fetcher": "website",
+        "link_pattern": "/news/\\d+/",
+        "max_items": 10,
+        "category_hint": "regulation"
+      }
+    },
+    {
+      "id": "src-tg-centralbank",
+      "name": "Telegram: Банк России",
+      "type": "telegram",
+      "url": "https://t.me/centralbank_russia",
+      "poll_interval_minutes": 20,
+      "config": {
+        "category_hint": "regulation"
+      }
+    },
+    {
+      "id": "src-tg-government",
+      "name": "Telegram: Правительство России",
+      "type": "telegram",
+      "url": "https://t.me/government_rus",
+      "poll_interval_minutes": 20,
+      "config": {
+        "category_hint": "regulation"
+      }
+    },
+    {
+      "id": "src-tg-rbc",
+      "name": "Telegram: РБК",
+      "type": "telegram",
+      "url": "https://t.me/rbc_news",
+      "poll_interval_minutes": 20,
+      "config": {
+        "category_hint": "media"
+      }
+    }
+  ]
+}

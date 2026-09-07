@@ -2,6 +2,8 @@ import os
 
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["DEMO_MODE"] = "true"
+os.environ["PARSER_ENABLED"] = "false"
+os.environ["PARSER_SEED_DEFAULTS"] = "false"
 os.environ.pop("OPENROUTER_API_KEY", None)
 
 import pytest

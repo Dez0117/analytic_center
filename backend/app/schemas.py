@@ -96,7 +96,7 @@ class ArticleAnalysis(BaseModel):
 
 class AnalyzeBatchRequest(BaseModel):
     item_ids: list[str] | None = None
-    limit: int = Field(default=20, ge=1, le=100)
+    limit: int = Field(default=40, ge=1, le=100)
 
 
 class ItemPatch(BaseModel):
@@ -121,6 +121,8 @@ class SourceCreate(BaseModel):
     type: SourceType = "website"
     url: str | None = None
     enabled: bool = True
+    poll_interval_minutes: int = Field(default=30, ge=1, le=1440)
+    config: dict[str, Any] = Field(default_factory=dict)
 
 
 class SourcePatch(BaseModel):
@@ -128,3 +130,12 @@ class SourcePatch(BaseModel):
     type: SourceType | None = None
     url: str | None = None
     enabled: bool | None = None
+    poll_interval_minutes: int | None = Field(default=None, ge=1, le=1440)
+    config: dict[str, Any] | None = None
+
+
+class PollRequest(BaseModel):
+    """Ручной запуск опроса. Без `source_ids` опрашиваются источники по расписанию."""
+
+    source_ids: list[str] | None = None
+    force: bool = False

@@ -1,4 +1,4 @@
-import type { Category, Item, Priority, RegulationCase, Source, Stats } from "./types";
+import type { Category, Item, ParserRun, ParserStatus, PollReport, Priority, RegulationCase, Source, Stats } from "./types";
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(path, {
@@ -32,7 +32,7 @@ export const api = {
   sources: () => request<Source[]>("/api/sources"),
   regulations: () => request<RegulationCase[]>("/api/regulations"),
   loadDemo: () => request<{ accepted: number; item_ids: string[] }>("/api/demo/load", { method: "POST" }),
-  analyzeBatch: () => request<{ total: number; succeeded: number }>("/api/items/analyze-batch", { method: "POST", body: JSON.stringify({ limit: 20 }) }),
+  analyzeBatch: () => request<{ total: number; succeeded: number }>("/api/items/analyze-batch", { method: "POST", body: JSON.stringify({ limit: 40 }) }),
   analyze: (id: string, again = false) => request<Item>(`/api/items/${id}/${again ? "reanalyze" : "analyze"}`, { method: "POST" }),
   patchItem: (id: string, data: unknown) => request<Item>(`/api/items/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   hideItem: (id: string) => request(`/api/items/${id}/hide`, { method: "POST" }),
@@ -40,4 +40,8 @@ export const api = {
   createSource: (data: unknown) => request<Source>("/api/sources", { method: "POST", body: JSON.stringify(data) }),
   patchSource: (id: string, data: unknown) => request<Source>(`/api/sources/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteSource: (id: string) => request<void>(`/api/sources/${id}`, { method: "DELETE" }),
+  pollSource: (id: string) => request<PollReport>(`/api/sources/${id}/poll`, { method: "POST" }),
+  runParser: (force = false) => request<ParserRun>("/api/parser/run", { method: "POST", body: JSON.stringify({ force }) }),
+  parserStatus: () => request<ParserStatus>("/api/parser/status"),
+  importDefaultSources: () => request<{ created: string[]; existing: string[] }>("/api/sources/import-defaults", { method: "POST" }),
 };

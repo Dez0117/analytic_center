@@ -1,6 +1,6 @@
-# GS Radar
+# GosRadar
 
-Рабочий вертикальный срез аналитического центра PR/GR: входной JSON любой близкой формы нормализуется в неизменяемый `RawItem`, объединяется в события, анализируется через OpenRouter или честный deterministic mock, проходит evidence/policy-проверки, сохраняется в SQLite и отображается в русском React-интерфейсе.
+Рабочий вертикальный срез аналитического центра PR/GR: модуль парсинга по расписанию опрашивает источники из БД (RSS, сайты регуляторов, Telegram-каналы), входной JSON любой близкой формы нормализуется в неизменяемый `RawItem`, объединяется в события, анализируется через OpenRouter или честный deterministic mock, проходит evidence/policy-проверки, сохраняется в SQLite и отображается в русском React-интерфейсе.
 
 ## Быстрый запуск
 
@@ -78,7 +78,19 @@ curl.exe -X POST http://localhost:8000/api/items/analyze-batch `
   -d '{"limit":20}'
 ```
 
-Основные endpoints: ingest, manual add, list/detail/filter/search, analyze/reanalyze/batch, patch/hide, НПА, CRUD источников, статистика и health. Полный контракт доступен в OpenAPI.
+Основные endpoints: ingest, manual add, list/detail/filter/search, analyze/reanalyze/batch, patch/hide, НПА, CRUD источников, опрос источников, статистика и health. Полный контракт доступен в OpenAPI.
+
+## Сбор данных из источников
+
+Источники хранятся в БД и правятся через интерфейс; планировщик поднимается вместе с backend и опрашивает каждый источник по его интервалу. Повторы отсекаются по каноническому URL и хешу текста, поэтому один материал не приезжает дважды из разных каналов.
+
+```powershell
+cd backend
+..\.venv\Scripts\python.exe -m app.parsing --seed --list
+..\.venv\Scripts\python.exe -m app.parsing --source src-cbr-events
+```
+
+Из API: `POST /api/sources/{id}/poll`, `POST /api/parser/run`, `GET /api/parser/status`. Типы источников, настройки `config`, расписание и ограничения описаны в [`docs/parsing-module.md`](docs/parsing-module.md).
 
 ## Где подключать реальный parser JSON
 
@@ -86,6 +98,7 @@ curl.exe -X POST http://localhost:8000/api/items/analyze-batch `
 
 ## Что реализовано
 
+- модуль парсинга: RSS/Atom, сайты регуляторов и Telegram-каналы, расписание на источник, условный GET, дозагрузка полного текста и отсечение повторов по URL и хешу;
 - 12 явно маркированных demo-материалов: шум, две пары дублей, новости, чувствительные темы, два НПА и обновление одного дела;
 - точный URL/hash и ограниченный fuzzy dedup с сохранением всех исходников в event cluster;
 - `MockLLMProvider` и `OpenRouterLLMProvider` за одним `LLMProvider`;
@@ -93,13 +106,16 @@ curl.exe -X POST http://localhost:8000/api/items/analyze-batch `
 - версии анализа, кэш, reanalyze, ручные overrides и audit без изменения исходного `RawItem`;
 - SQLite/SQLAlchemy, FastAPI, фильтры и поиск;
 - страницы «Сегодня», «НПА на контроле», «Источники», ручное добавление и detail drawer;
+- управление источниками в интерфейсе: расписание, настройки разбора, опрос по кнопке, состояние последнего опроса и переход к собранным материалам;
 - loading/empty/error, demo mode, сохранение правок после перезагрузки.
 
 ## Допущения и честные ограничения demo
 
 - Это локальный hackathon MVP без авторизации; автор правок — `demo-user`.
 - Таблицы создаются через SQLAlchemy `create_all`; Alembic нужен при первой общей/production БД.
-- CRUD источников — management shell, реальные RSS/Telegram/site scrapers принадлежат другой части команды.
+- Извлечение текста с произвольного сайта — baseline на стандартной библиотеке; часть служебных блоков отдельных сайтов остаётся в тексте, это правится настройками источника без правки кода.
+- Планировщик живёт в процессе backend: для нескольких реплик нужна внешняя очередь.
+- Telegram читается через публичное веб-превью, Bot API и приватные каналы вне MVP.
 - Fuzzy dedup — объяснимый baseline на заголовках за три дня; разные мнения не схлопываются. Embeddings нужны только после размеченных ошибок baseline.
 - Mock-анализ детерминирован и не выдаётся за настоящий AI. Fixtures вымышлены и помечены `demo`.
 - Реальный OpenRouter-вызов не проверяется без пользовательского секрета; локальный fallback и весь остальной vertical slice работают без сети.

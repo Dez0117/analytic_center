@@ -1,12 +1,18 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { api, type Filters } from "./api";
-import type { Category, Item, Priority, RegulationCase, Source, Stats } from "./types";
+import type { Category, Item, ParserStatus, PollStatus, Priority, RegulationCase, Source, SourceType, Stats } from "./types";
 
 type Tab = "today" | "regulations" | "sources" | "manual";
 
 const priorityText: Record<Priority, string> = { high: "Высокий", medium: "Средний", low: "Низкий" };
 const categoryText: Record<Category, string> = {
   regulation: "Регулирование", reputation: "Репутация", competitors: "Конкуренты", trends: "Тренды",
+};
+const sourceTypeText: Record<SourceType, string> = {
+  rss: "RSS", website: "Сайт", regulator: "Регулятор", telegram: "Telegram", manual: "Ручной", unknown: "Не задан",
+};
+const pollStatusText: Record<PollStatus, string> = {
+  ok: "Материалы собраны", not_modified: "Без изменений", skipped: "Не опрашивается", error: "Ошибка опроса",
 };
 const fieldText: Record<string, string> = {
   title: "Заголовок", summary: "Саммари", primary_category: "Категория",
@@ -16,6 +22,8 @@ const fieldText: Record<string, string> = {
 const formatDate = (value: string | null, withTime = true) => value
   ? new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}) }).format(new Date(value))
   : "не указано";
+
+type Run = <T,>(work: () => Promise<T>, message?: string | ((result: T) => string)) => Promise<T | undefined>;
 
 function Spinner() { return <span className="spinner" aria-label="Загрузка" />; }
 
@@ -27,7 +35,7 @@ function Sidebar({ tab, onTab, stats }: { tab: Tab; onTab: (tab: Tab) => void; s
     ["manual", "+", "Добавить материал"],
   ];
   return <aside className="sidebar">
-    <div className="brand"><div className="brand-mark"><i /><i /><i /></div><div><strong>GS RADAR</strong><span>аналитический центр</span></div></div>
+    <div className="brand"><div className="brand-mark"><i /><i /><i /></div><div><strong>GosRadar</strong><span>аналитический центр</span></div></div>
     <nav>
       <span className="nav-label">Рабочее пространство</span>
       {nav.map(([key, icon, label, count]) => <button key={key} className={tab === key ? "active" : ""} onClick={() => onTab(key)}>
@@ -63,7 +71,8 @@ function ItemCard({ item, onOpen }: { item: Item; onOpen: (item: Item) => void }
     {analysis?.impact_for_gs_labs && <div className="impact"><span>Почему важно GS Labs</span>{analysis.impact_for_gs_labs}</div>}
     <div className="card-meta">
       <span className="source-avatar">{item.source.name.slice(0, 1)}</span>
-      <span>{item.source.name}</span><i />
+      <span>{item.source.name}</span>
+      <span className="type-badge small">{sourceTypeText[item.source.type as SourceType] || item.source.type}</span><i />
       <span>{formatDate(item.published_at || item.fetched_at)}</span>
       {item.cluster_sources.length > 1 && <><i /><span className="cluster-count">⧉ {item.cluster_sources.length} источника</span></>}
     </div>
@@ -88,7 +97,7 @@ function FiltersBar({ filters, setFilters, sources }: { filters: Filters; setFil
   </div>;
 }
 
-function DetailDrawer({ item, onClose, onChanged, run }: { item: Item; onClose: () => void; onChanged: (item?: Item) => void; run: <T>(work: () => Promise<T>, message?: string) => Promise<T | undefined> }) {
+function DetailDrawer({ item, onClose, onChanged, run }: { item: Item; onClose: () => void; onChanged: (item?: Item) => void; run: Run }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState({ title: "", summary: "", primary_category: "trends" as Category, manual_priority: "" as Priority | "", tags: "", reason: "" });
@@ -166,16 +175,160 @@ function Regulations({ cases, onOpen }: { cases: RegulationCase[]; onOpen: (id: 
   </div>;
 }
 
-function SourcesPage({ sources, onChanged, run }: { sources: Source[]; onChanged: () => void; run: <T>(work: () => Promise<T>, message?: string) => Promise<T | undefined> }) {
-  const [form, setForm] = useState({ name: "", type: "website", url: "" });
-  const submit = async (event: FormEvent) => { event.preventDefault(); const saved = await run(() => api.createSource(form), "Источник добавлен"); if (saved) { setForm({ name: "", type: "website", url: "" }); onChanged(); } };
-  return <div className="page-section"><div className="section-heading"><div><span className="eyebrow">Контур сбора</span><h2>Источники</h2><p>Конфигурации для scraper-команды. Сам сбор в этот MVP не входит.</p></div></div>
-    <form className="source-form" onSubmit={submit}><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Название источника" /><input type="url" value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} placeholder="https://…" /><select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}><option value="website">Сайт</option><option value="rss">RSS</option><option value="regulator">Регулятор</option><option value="telegram">Telegram</option><option value="manual">Ручной</option></select><button className="button primary">Добавить</button></form>
-      <div className="source-table"><div className="table-head"><span>Источник</span><span>Тип</span><span>Последний успех</span><span>Состояние</span><span /></div>{sources.map(source => <div className="table-row" key={source.id}><div><span className="source-avatar">{source.name.slice(0, 1)}</span><p><b>{source.name}</b><small>{source.url || "URL не указан"}</small></p></div><span className="type-badge">{source.type}</span><span>{formatDate(source.last_success)}</span><label className="switch"><input type="checkbox" checked={source.enabled} onChange={async () => { await run(() => api.patchSource(source.id, { enabled: !source.enabled }), "Настройка сохранена"); onChanged(); }} /><i /></label><button className="delete" aria-label="Удалить" onClick={async () => { await run(() => api.deleteSource(source.id), "Источник удалён"); onChanged(); }}>×</button></div>)}</div>
+function SourceRow({ source, onChanged, onShowItems, run }: { source: Source; onChanged: () => void; onShowItems: (id: string) => void; run: Run }) {
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
+  const blank = () => ({
+    name: source.name,
+    url: source.url || "",
+    type: source.type,
+    poll_interval_minutes: String(source.poll_interval_minutes),
+    config: JSON.stringify(source.config || {}, null, 2),
+  });
+  const [draft, setDraft] = useState(blank);
+  useEffect(() => { setDraft(blank()); setProblem(""); }, [source]);
+
+  const save = async () => {
+    let config: Record<string, unknown>;
+    try { config = draft.config.trim() ? JSON.parse(draft.config) : {}; }
+    catch { setProblem("Настройки сбора должны быть корректным JSON"); return; }
+    const interval = Number(draft.poll_interval_minutes);
+    if (!Number.isInteger(interval) || interval < 1 || interval > 1440) { setProblem("Интервал опроса — целое число от 1 до 1440 минут"); return; }
+    setProblem(""); setBusy(true);
+    const saved = await run(() => api.patchSource(source.id, {
+      name: draft.name, url: draft.url, type: draft.type, poll_interval_minutes: interval, config,
+    }), "Источник обновлён");
+    setBusy(false);
+    if (saved) { setEditing(false); onChanged(); }
+  };
+
+  const poll = async () => {
+    setBusy(true);
+    const report = await run(() => api.pollSource(source.id), result => result.status === "error"
+      ? `${result.source_name}: опрос не удался`
+      : result.status === "skipped" ? `${result.source_name}: источник не опрашивается`
+      : `${result.source_name}: получено ${result.fetched}, новых ${result.stored}, повторов ${result.duplicates}`);
+    setBusy(false);
+    if (report) onChanged();
+  };
+
+  const remove = async () => {
+    if (!window.confirm(`Удалить источник «${source.name}»? Собранные материалы останутся в ленте.`)) return;
+    await run(() => api.deleteSource(source.id), "Источник удалён");
+    onChanged();
+  };
+
+  return <>
+    <div className={`table-row${source.enabled ? "" : " off"}`}>
+      <div><span className="source-avatar">{source.name.slice(0, 1)}</span><p><b>{source.name}</b><small>{source.url || "URL не указан"}</small></p></div>
+      <span className="type-badge">{sourceTypeText[source.type] || source.type}</span>
+      <span>{source.pollable ? `каждые ${source.poll_interval_minutes} мин` : "вручную"}</span>
+      <button className="link-count" disabled={!source.items_count} onClick={() => onShowItems(source.id)} title="Показать материалы этого источника">
+        {source.items_count}{source.items_count > 0 && <i>→</i>}
+      </button>
+      <span className={`poll-state ${source.last_status || "none"}`} title={source.last_error || ""}>
+        <i />
+        <p><b>{source.last_status ? pollStatusText[source.last_status] : "Ещё не опрашивался"}</b>
+        <small>{source.last_polled_at ? formatDate(source.last_polled_at) : "нет данных"}</small></p>
+      </span>
+      <label className="switch" title={source.enabled ? "Выключить сбор" : "Включить сбор"}>
+        <input type="checkbox" checked={source.enabled} onChange={async () => { await run(() => api.patchSource(source.id, { enabled: !source.enabled }), "Настройка сохранена"); onChanged(); }} /><i />
+      </label>
+      <div className="row-actions">
+        <button className="button tiny" disabled={busy || !source.pollable || !source.enabled} onClick={poll}>{busy ? <Spinner /> : "Опросить"}</button>
+        <button className="button tiny ghost" onClick={() => setEditing(!editing)}>{editing ? "Свернуть" : "Изменить"}</button>
+        <button className="delete" aria-label="Удалить источник" onClick={remove}>×</button>
+      </div>
+    </div>
+    {editing && <div className="source-edit">
+      <div className="form-row">
+        <label>Название<input value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} /></label>
+        <label>Адрес<input value={draft.url} onChange={e => setDraft({ ...draft, url: e.target.value })} placeholder="https://… или @channel" /></label>
+      </div>
+      <div className="form-row">
+        <label>Тип<select value={draft.type} onChange={e => setDraft({ ...draft, type: e.target.value as SourceType })}>
+          {Object.entries(sourceTypeText).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select></label>
+        <label>Интервал опроса, мин<input type="number" min={1} max={1440} value={draft.poll_interval_minutes} onChange={e => setDraft({ ...draft, poll_interval_minutes: e.target.value })} /></label>
+      </div>
+      <label>Настройки сбора (JSON)<textarea rows={5} spellCheck={false} value={draft.config} onChange={e => setDraft({ ...draft, config: e.target.value })} /></label>
+      <p className="hint">fetcher, max_items, fetch_full_text, link_pattern, min_text_chars — разбор источника настраивается без правки кода.</p>
+      {source.last_error && <p className="row-error">Последняя ошибка: {source.last_error}</p>}
+      {problem && <p className="row-error">{problem}</p>}
+      <div className="edit-actions">
+        <button className="button ghost" onClick={() => { setDraft(blank()); setEditing(false); setProblem(""); }}>Отмена</button>
+        <button className="button primary" disabled={busy} onClick={save}>{busy ? <Spinner /> : "Сохранить источник"}</button>
+      </div>
+    </div>}
+  </>;
+}
+
+function SourcesPage({ sources, parser, onChanged, onShowItems, run }: { sources: Source[]; parser: ParserStatus | null; onChanged: () => void; onShowItems: (id: string) => void; run: Run }) {
+  const [form, setForm] = useState({ name: "", type: "rss", url: "", poll_interval_minutes: "30" });
+  const [busy, setBusy] = useState(false);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const saved = await run(() => api.createSource({ ...form, poll_interval_minutes: Number(form.poll_interval_minutes) || 30 }), "Источник добавлен, сбор начнётся по расписанию");
+    if (saved) { setForm({ name: "", type: "rss", url: "", poll_interval_minutes: "30" }); onChanged(); }
+  };
+  const collected = sources.reduce((total, source) => total + source.items_count, 0);
+  const failing = sources.filter(source => source.last_status === "error");
+
+  const pollAll = async (force: boolean) => {
+    setBusy(true);
+    const result = await run(() => api.runParser(force), value => value.polled === 0
+      ? "По расписанию сейчас опрашивать нечего"
+      : `Опрошено источников: ${value.polled}, новых материалов: ${value.stored}, повторов отсечено: ${value.duplicates}`);
+    setBusy(false);
+    if (result) onChanged();
+  };
+  const importDefaults = async () => {
+    const result = await run(api.importDefaultSources, value => `Добавлено источников: ${value.created.length}`);
+    if (result) onChanged();
+  };
+
+  return <div className="page-section"><div className="section-heading"><div><span className="eyebrow">Контур сбора</span><h2>Источники</h2>
+    <p>СМИ, сайты регуляторов и Telegram-каналы. Каждый источник опрашивается по своему интервалу, повторы отсекаются по ссылке и тексту.</p></div></div>
+
+    <div className="parser-panel">
+      <div className={`parser-state ${parser?.running ? "live" : "idle"}`}><i />
+        <p><b>{parser?.running ? "Планировщик работает" : parser?.enabled === false ? "Планировщик выключен" : "Планировщик не запущен"}</b>
+        <small>{parser ? `проверка расписания каждые ${parser.tick_seconds} с · ждут опроса: ${parser.due_now} · последний запуск: ${formatDate(parser.last_run_at)}` : "нет данных"}</small></p>
+      </div>
+      <div className="parser-actions">
+        <button className="button ghost" disabled={busy} onClick={() => pollAll(false)}>{busy ? <Spinner /> : "Опросить по расписанию"}</button>
+        <button className="button primary" disabled={busy} onClick={() => pollAll(true)}>{busy ? <Spinner /> : "Опросить все источники"}</button>
+      </div>
+    </div>
+
+    <div className="source-stats">
+      <span><b>{sources.length}</b> источников, включено {sources.filter(source => source.enabled).length}</span>
+      <span><b>{collected}</b> материалов собрано</span>
+      {failing.length > 0 && <span className="bad"><b>{failing.length}</b> с ошибкой опроса</span>}
+      {sources.length === 0 && <button className="button tiny ghost" onClick={importDefaults}>Добавить источники по умолчанию</button>}
+    </div>
+
+    <form className="source-form" onSubmit={submit}>
+      <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Название источника" />
+      <input value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} placeholder="https://…/rss.xml или @channel" />
+      <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
+        {Object.entries(sourceTypeText).filter(([value]) => value !== "unknown").map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </select>
+      <input type="number" min={1} max={1440} aria-label="Интервал опроса в минутах" value={form.poll_interval_minutes} onChange={e => setForm({ ...form, poll_interval_minutes: e.target.value })} />
+      <button className="button primary">Добавить</button>
+    </form>
+
+    {sources.length === 0
+      ? <Empty title="Источников пока нет" text="Добавьте RSS-ленту, сайт регулятора или Telegram-канал — сбор начнётся автоматически." />
+      : <div className="source-table">
+        <div className="table-head"><span>Источник</span><span>Тип</span><span>Расписание</span><span>Собрано</span><span>Последний опрос</span><span>Сбор</span><span /></div>
+        {sources.map(source => <SourceRow key={source.id} source={source} onChanged={onChanged} onShowItems={onShowItems} run={run} />)}
+      </div>}
   </div>;
 }
 
-function ManualPage({ onCreated, run }: { onCreated: (item: Item) => void; run: <T>(work: () => Promise<T>, message?: string) => Promise<T | undefined> }) {
+function ManualPage({ onCreated, run }: { onCreated: (item: Item) => void; run: Run }) {
   const [form, setForm] = useState({ title: "", text: "", url: "", source_name: "Ручное добавление", published_at: "" });
   const submit = async (event: FormEvent) => { event.preventDefault(); const item = await run(() => api.createManual({ ...form, published_at: form.published_at || null }), "Материал добавлен"); if (item) { setForm({ title: "", text: "", url: "", source_name: "Ручное добавление", published_at: "" }); onCreated(item); } };
   return <div className="page-section manual-page"><div className="section-heading"><div><span className="eyebrow">Ручной импорт</span><h2>Добавить материал</h2><p>Для материалов вне настроенных источников. Анализ можно запустить сразу из карточки.</p></div></div>
@@ -191,6 +344,8 @@ export default function App() {
   const [sources, setSources] = useState<Source[]>([]);
   const [regulations, setRegulations] = useState<RegulationCase[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [parser, setParser] = useState<ParserStatus | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [filters, setFilters] = useState<Filters>({});
   const [selected, setSelected] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
@@ -201,36 +356,59 @@ export default function App() {
   const refresh = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const [newItems, newSources, newRegulations, newStats] = await Promise.all([api.items(filters), api.sources(), api.regulations(), api.stats()]);
-      setItems(newItems); setSources(newSources); setRegulations(newRegulations); setStats(newStats);
+      const [newItems, newSources, newRegulations, newStats, newParser] = await Promise.all([
+        api.items(filters), api.sources(), api.regulations(), api.stats(), api.parserStatus(),
+      ]);
+      setItems(newItems); setSources(newSources); setRegulations(newRegulations); setStats(newStats); setParser(newParser);
+      setUpdatedAt(new Date());
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Не удалось загрузить данные"); }
     finally { setLoading(false); }
   }, [filters]);
   useEffect(() => { const timer = setTimeout(refresh, filters.q ? 250 : 0); return () => clearTimeout(timer); }, [refresh, filters.q]);
+  useEffect(() => {
+    if (tab !== "today" || selected) return;
+    const timer = setInterval(refresh, 60000);
+    return () => clearInterval(timer);
+  }, [tab, selected, refresh]);
 
-  const run = async <T,>(work: () => Promise<T>, message?: string): Promise<T | undefined> => {
+  const run: Run = async (work, message) => {
     setError("");
-    try { const result = await work(); if (message) { setToast(message); setTimeout(() => setToast(""), 2800); } return result; }
+    try {
+      const result = await work();
+      const text = typeof message === "function" ? message(result) : message;
+      if (text) { setToast(text); setTimeout(() => setToast(""), 3600); }
+      return result;
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Неизвестная ошибка"); return undefined; }
   };
   const demo = async () => { setBusy(true); const result = await run(api.loadDemo, "Demo-набор загружен"); if (result) await refresh(); setBusy(false); };
   const analyze = async () => { setBusy(true); const result = await run(api.analyzeBatch, "Анализ завершён"); if (result) await refresh(); setBusy(false); };
   const openById = async (id: string) => { const item = await run(() => api.item(id)); if (item) setSelected(item); };
+  const collect = async () => {
+    setBusy(true);
+    const result = await run(() => api.runParser(false), value => value.polled === 0
+      ? "По расписанию сейчас опрашивать нечего"
+      : `Опрошено источников: ${value.polled}, новых материалов: ${value.stored}`);
+    if (result) await refresh();
+    setBusy(false);
+  };
+  const showSourceItems = (id: string) => { setFilters({ source: id }); setTab("today"); };
   const heading = useMemo(() => new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "numeric", month: "long" }).format(new Date()), []);
 
   return <div className="app-shell">
     <Sidebar tab={tab} onTab={setTab} stats={stats} />
     <main>
-      <header className="topbar"><div><span className="live-dot" />Обновлено только что</div><div className="demo-badge">{stats?.demo_mode ? "Демо-режим" : "OpenRouter"}</div><div className="user"><span>ДА</span><p><b>Демо Аналитик</b><small>PR / GR</small></p></div></header>
+      <header className="topbar"><div><span className={`live-dot${parser?.running ? "" : " off"}`} />{updatedAt ? `Обновлено в ${new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(updatedAt)}` : "Загрузка…"}{parser?.running && " · сбор идёт по расписанию"}</div><div className="demo-badge">{stats?.demo_mode ? "Демо-режим" : "OpenRouter"}</div><div className="user"><span>ДА</span><p><b>Демо Аналитик</b><small>PR / GR</small></p></div></header>
       {tab === "today" && <div className="page-section">
-        <div className="hero"><div><span className="eyebrow">Оперативная повестка</span><h1>Сегодня</h1><p>{heading.charAt(0).toUpperCase() + heading.slice(1)} · одна карточка на событие</p></div><div className="hero-actions"><button className="button ghost" disabled={busy} onClick={demo}>{busy ? <Spinner /> : "↓ Загрузить demo-данные"}</button><button className="button primary" disabled={busy || !stats?.raw_items} onClick={analyze}>{busy ? <Spinner /> : "✦ Проанализировать последние"}</button></div></div>
+        <div className="hero"><div><span className="eyebrow">Оперативная повестка</span><h1>Сегодня</h1><p>{heading.charAt(0).toUpperCase() + heading.slice(1)} · одна карточка на событие</p></div><div className="hero-actions">{stats?.demo_mode && <button className="button ghost" disabled={busy} onClick={demo}>{busy ? <Spinner /> : "↓ Загрузить demo-данные"}</button>}<button className="button ghost" disabled={busy} onClick={collect}>{busy ? <Spinner /> : "⟳ Собрать из источников"}</button><button className="button primary" disabled={busy || !stats?.raw_items} onClick={analyze}>{busy ? <Spinner /> : "✦ Проанализировать последние"}</button></div></div>
         <div className="metrics"><Metric label="Событий в повестке" value={stats?.events || 0} tone="green" hint={`${stats?.raw_items || 0} исходных материалов`} /><Metric label="Высокий приоритет" value={stats?.high || 0} tone="red" hint="требуют внимания сегодня" /><Metric label="Нужна проверка" value={stats?.review || 0} tone="amber" hint="очередь аналитика" /><Metric label="Обработано AI" value={stats?.analyzed || 0} tone="blue" hint={`среднее ${stats?.average_latency_ms || 0} мс`} /></div>
+        {items.length > 0 && filters.source && <div className="filter-note">Показаны материалы источника <b>{sources.find(source => source.id === filters.source)?.name || filters.source}</b><button className="clear" onClick={() => setFilters({})}>Показать все</button></div>}
         <FiltersBar filters={filters} setFilters={setFilters} sources={sources} />
         <div className="feed-head"><h2>События <span>{items.length}</span></h2><span>Сначала важные</span></div>
-        {loading ? <div className="loading"><Spinner /> Загружаем повестку…</div> : items.length ? <div className="feed">{items.map(item => <ItemCard key={item.cluster_id} item={item} onOpen={setSelected} />)}</div> : <Empty title="Повестка пока пуста" text="Загрузите честно маркированный demo-набор или добавьте материал вручную." />}
+        {loading ? <div className="loading"><Spinner /> Загружаем повестку…</div> : items.length ? <div className="feed">{items.map(item => <ItemCard key={item.cluster_id} item={item} onOpen={setSelected} />)}</div> : <Empty title="Повестка пока пуста" text={stats?.demo_mode ? "Загрузите честно маркированный demo-набор или добавьте материал вручную." : "Соберите материалы из подключённых источников или добавьте публикацию вручную."} />}
       </div>}
       {tab === "regulations" && <Regulations cases={regulations} onOpen={openById} />}
-      {tab === "sources" && <SourcesPage sources={sources} onChanged={refresh} run={run} />}
+      {tab === "sources" && <SourcesPage sources={sources} parser={parser} onChanged={refresh} onShowItems={showSourceItems} run={run} />}
       {tab === "manual" && <ManualPage run={run} onCreated={item => { setSelected(item); refresh(); }} />}
     </main>
     {selected && <DetailDrawer item={selected} onClose={() => setSelected(null)} run={run} onChanged={async item => { if (item) setSelected(item); else setSelected(null); await refresh(); }} />}

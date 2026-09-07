@@ -60,14 +60,62 @@ export interface Item {
   analysis_meta: { version: number; model: string; prompt_version: string; latency_ms: number; created_at: string } | null;
 }
 
+export type SourceType = "rss" | "website" | "regulator" | "telegram" | "manual" | "unknown";
+export type PollStatus = "ok" | "not_modified" | "skipped" | "error";
+
 export interface Source {
   id: string;
   name: string;
-  type: string;
+  type: SourceType;
   url: string | null;
   enabled: boolean;
   last_success: string | null;
   last_error: string | null;
+  poll_interval_minutes: number;
+  config: Record<string, unknown>;
+  last_polled_at: string | null;
+  last_status: PollStatus | null;
+  last_item_count: number;
+  pollable: boolean;
+  items_count: number;
+}
+
+export interface PollReport {
+  source_id: string;
+  source_name: string;
+  source_type: string;
+  status: PollStatus;
+  fetched: number;
+  stored: number;
+  duplicates: number;
+  known: number;
+  invalid: number;
+  skipped_known_urls: number;
+  item_ids: string[];
+  warnings: string[];
+  error: string | null;
+  duration_ms: number;
+  polled_at: string;
+}
+
+export interface ParserStatus {
+  enabled: boolean;
+  running: boolean;
+  tick_seconds: number;
+  default_interval_minutes: number;
+  started_at: string | null;
+  last_run_at: string | null;
+  runs: number;
+  due_now: number;
+  last_reports: PollReport[];
+}
+
+export interface ParserRun {
+  polled: number;
+  stored: number;
+  duplicates: number;
+  errors: number;
+  reports: PollReport[];
 }
 
 export interface RegulationCase {
